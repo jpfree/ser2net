@@ -18,7 +18,7 @@ jobs:
       GOOS: linux
       GOARCH: mipsle
       CGO_ENABLED: "0"
-      ROOTFS: ${{ runner.home }}/mipsel-rootfs
+      ROOTFS: $HOME/mipsel-rootfs
 
     steps:
       - name: Checkout source
@@ -51,7 +51,8 @@ jobs:
           wget https://www.openssl.org/source/openssl-1.1.1w.tar.gz
           tar xvf openssl-1.1.1w.tar.gz
           cd openssl-1.1.1w
-          ./Configure linux-mips32 --cross-compile-prefix=mipsel-linux-gnu- --prefix="$ROOTFS/usr" no-tests no-shared
+          ./Configure linux-mips32 --cross-compile-prefix=mipsel-linux-gnu- \
+            --prefix="$ROOTFS/usr" no-tests no-shared
           make -j"$(nproc)"
           make install_sw
 
@@ -60,19 +61,21 @@ jobs:
           git clone https://github.com/cminyard/gensio.git
           cd gensio
           autoreconf -i
-          PKG_CONFIG_PATH="$ROOTFS/usr/lib/pkgconfig" ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" CPPFLAGS="-I$ROOTFS/usr/include" LDFLAGS="-L$ROOTFS/usr/lib" --disable-cxx --disable-swig --disable-examples --without-go || true
+          PKG_CONFIG_PATH="$ROOTFS/usr/lib/pkgconfig" \
+            ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" \
+              CPPFLAGS="-I$ROOTFS/usr/include" \
+              LDFLAGS="-L$ROOTFS/usr/lib" \
+              --disable-cxx --disable-swig --disable-examples --without-go || true
 
-          # 方案 A: 在生成的 Makefile 中移除对子目录 go 的引用
+          # Remove 'go' from SUBDIRS in Makefiles
           files=$(grep -lR "SUBDIRS" . || true)
-          if [ -n "$files" ]; then
-            for f in $files; do
-              cp "$f" "$f.bak" || true
-              sed -E -i 's/(^|[[:space:]])go([[:space:]]|$)/ /g' "$f" || true
-              sed -E -i 's/[[:space:]]+/ /g' "$f" || true
-            done
-          fi
+          for f in $files; do
+            cp "$f" "$f.bak" || true
+            sed -E -i 's/(^|[[:space:]])go([[:space:]]|$)/ /g' "$f" || true
+            sed -E -i 's/[[:space:]]+/ /g' "$f" || true
+          done
 
-          # 方案 B 兜底: 若 c++/swig/go 缺失，创建占位 Makefile 防止递归 make 失败
+          # Create dummy Makefile if go dir is missing
           if [ ! -d "c++/swig/go" ]; then
             mkdir -p c++/swig/go
             printf '%s\n' '# dummy Makefile to satisfy recursive build' 'all:' 'install:' 'clean:' '.PHONY: all install clean' > c++/swig/go/Makefile
@@ -84,14 +87,17 @@ jobs:
       - name: Build ser2net for mipsel (skip go examples)
         run: |
           ./reconf
-          PKG_CONFIG_PATH="$ROOTFS/usr/lib/pkgconfig" ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" CPPFLAGS="-I$ROOTFS/usr/include" LDFLAGS="-L$ROOTFS/usr/lib"
+          PKG_CONFIG_PATH="$ROOTFS/usr/lib/pkgconfig" \
+            ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" \
+              CPPFLAGS="-I$ROOTFS/usr/include" \
+              LDFLAGS="-L$ROOTFS/usr/lib"
           make -j"$(nproc)" -C src
           make install DESTDIR="$ROOTFS"
 
       - name: Sanity list installed files
         run: |
-          echo "Installed tree under $ROOTFS (show top-level)"
-          ls -la "$ROOTFS/usr" || true
+          echo "Installed tree under $ROOTFS:"
+          find "$ROOTFS/usr" -type f | sort
 
       - name: Package artifact
         run: |
