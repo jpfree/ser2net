@@ -56,7 +56,14 @@ jobs:
             --disable-shared --enable-static \
             CPPFLAGS="-I$ROOTFS/usr/include" \
             LDFLAGS="-L$ROOTFS/usr/lib -static"
+
+          # 删除 swig/go 示例目录，防止触发 cgo 构建
           rm -rf c++/swig/go c++/swig/python c++/swig/examples || true
+
+          # 创建 libexec 目录，避免 install-exec-hook 报错
+          mkdir -p "$ROOTFS/usr/libexec/gensio/3.0.0"
+
+          # 构建核心库并安装头文件
           make -C lib -j"$(nproc)"
           make -C lib install
           make -C include install
