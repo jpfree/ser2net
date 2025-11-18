@@ -1,0 +1,62 @@
+name: Build ser2net for mipsel
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-mipsel:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install cross toolchain and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-mipsel-linux-gnu g++-mipsel-linux-gnu \
+            make autoconf automake libtool pkg-config \
+            wget git
+
+      - name: Build libyaml for mipsel
+        run: |
+          wget https://pyyaml.org/download/libyaml/yaml-0.2.5.tar.gz
+          tar xvf yaml-0.2.5.tar.gz
+          cd yaml-0.2.5
+          ./configure --host=mipsel-linux-gnu --prefix=$HOME/mipsel-rootfs/usr
+          make -j$(nproc)
+          make install
+
+      - name: Build gensio for mipsel
+        run: |
+          git clone https://github.com/cminyard/gensio.git
+          cd gensio
+          ./configure --host=mipsel-linux-gnu --prefix=$HOME/mipsel-rootfs/usr \
+            CPPFLAGS="-I$HOME/mipsel-rootfs/usr/include" \
+            LDFLAGS="-L$HOME/mipsel-rootfs/usr/lib"
+          make -j$(nproc)
+          make install
+
+      - name: Build ser2net for mipsel
+        run: |
+          ./reconf
+          ./configure --host=mipsel-linux-gnu --prefix=$HOME/mipsel-rootfs/usr \
+            CPPFLAGS="-I$HOME/mipsel-rootfs/usr/include" \
+            LDFLAGS="-L$HOME/mipsel-rootfs/usr/lib"
+          make -j$(nproc)
+          make install DESTDIR=$HOME/mipsel-rootfs
+
+      - name: Package artifact
+        run: |
+          tar czf ser2net-mipsel.tar.gz -C $HOME/mipsel-rootfs .
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ser2net-mipsel
+          path: ser2net-mipsel.tar.gz
