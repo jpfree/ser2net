@@ -12,11 +12,9 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # 避免注入不兼容的宿主机标志
       CFLAGS: ""
       CXXFLAGS: ""
       LDFLAGS: ""
-      # 明确 Go 环境，且不使用 cgo（仅防御性设置；实际我们会禁用 go 构建）
       GOOS: linux
       GOARCH: mipsle
       CGO_ENABLED: "0"
@@ -42,43 +40,42 @@ jobs:
           make -j"$(nproc)"
           make install
 
+      - name: Build OpenSSL for mipsel
+        run: |
+          wget https://www.openssl.org/source/openssl-1.1.1w.tar.gz
+          tar xvf openssl-1.1.1w.tar.gz
+          cd openssl-1.1.1w
+          ./Configure linux-mips32 \
+            --cross-compile-prefix=mipsel-linux-gnu- \
+            --prefix=$HOME/mipsel-rootfs/usr \
+            no-tests
+          make -j"$(nproc)"
+          make install_sw
+
       - name: Build gensio (C library only) for mipsel
         run: |
           git clone https://github.com/cminyard/gensio.git
           cd gensio
-          # 生成 configure 脚本
           autoreconf -i
-
-          # 强制禁用 C++/SWIG/Go/示例，防止进入 go 目录触发 cgo
-          # 注：如果个别参数未被识别，后面还有“删除目录”的兜底策略
+          PKG_CONFIG_PATH="$HOME/mipsel-rootfs/usr/lib/pkgconfig" \
           ./configure --host=mipsel-linux-gnu --prefix=$HOME/mipsel-rootfs/usr \
             CPPFLAGS="-I$HOME/mipsel-rootfs/usr/include" \
             LDFLAGS="-L$HOME/mipsel-rootfs/usr/lib" \
             --disable-cxx \
             --disable-swig \
-            --disable-examples \
-            --without-go || true
-
-          # 兜底：直接移除会触发 go/cgo 的子目录，避免 make 递归构建
+            --disable-examples
           rm -rf c++/swig/go c++/swig/python c++/swig/examples || true
-
-          # 构建并安装（只会构建必要的 C 库部分）
           make -j"$(nproc)"
           make install
 
       - name: Build ser2net for mipsel (skip go examples)
         run: |
           ./reconf
-
-          # 正常配置 ser2net
+          PKG_CONFIG_PATH="$HOME/mipsel-rootfs/usr/lib/pkgconfig" \
           ./configure --host=mipsel-linux-gnu --prefix=$HOME/mipsel-rootfs/usr \
             CPPFLAGS="-I$HOME/mipsel-rootfs/usr/include" \
             LDFLAGS="-L$HOME/mipsel-rootfs/usr/lib"
-
-          # 仅构建主程序 src，跳过示例和额外绑定
           make -j"$(nproc)" -C src
-
-          # 安装到打包根目录
           make install DESTDIR=$HOME/mipsel-rootfs
 
       - name: Package artifact
