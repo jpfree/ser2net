@@ -56,35 +56,18 @@ jobs:
           make -j"$(nproc)"
           make install_sw
 
-      - name: Build gensio (C library only) for mipsel with Makefile patching
+      - name: Build gensio (only lib) for mipsel
         run: |
           git clone https://github.com/cminyard/gensio.git
           cd gensio
-          autoreconf -i
-          PKG_CONFIG_PATH="$ROOTFS/usr/lib/pkgconfig" \
-            ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" \
-              CPPFLAGS="-I$ROOTFS/usr/include" \
-              LDFLAGS="-L$ROOTFS/usr/lib" \
-              --disable-cxx --disable-swig --disable-examples --without-go || true
+          autoreconf -fi
+          ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" \
+            CPPFLAGS="-I$ROOTFS/usr/include" \
+            LDFLAGS="-L$ROOTFS/usr/lib"
+          make -C lib -j"$(nproc)"
+          make -C lib install
 
-          # Remove 'go' from SUBDIRS in Makefiles
-          files=$(grep -lR "SUBDIRS" . || true)
-          for f in $files; do
-            cp "$f" "$f.bak" || true
-            sed -E -i 's/(^|[[:space:]])go([[:space:]]|$)/ /g' "$f" || true
-            sed -E -i 's/[[:space:]]+/ /g' "$f" || true
-          done
-
-          # Create dummy Makefile if go dir is missing
-          if [ ! -d "c++/swig/go" ]; then
-            mkdir -p c++/swig/go
-            printf '%s\n' '# dummy Makefile to satisfy recursive build' 'all:' 'install:' 'clean:' '.PHONY: all install clean' > c++/swig/go/Makefile
-          fi
-
-          make -j"$(nproc)"
-          make install
-
-      - name: Build ser2net for mipsel (skip go examples)
+      - name: Build ser2net for mipsel
         run: |
           ./reconf
           PKG_CONFIG_PATH="$ROOTFS/usr/lib/pkgconfig" \
