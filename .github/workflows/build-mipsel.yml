@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
+      # Avoid host-specific flags bleeding into cross builds
       CFLAGS: ""
       LDFLAGS: ""
 
@@ -33,7 +34,7 @@ jobs:
           tar xvf yaml-0.2.5.tar.gz
           cd yaml-0.2.5
           ./configure --host=mipsel-linux-gnu --prefix=$HOME/mipsel-rootfs/usr
-          make -j$(nproc)
+          make -j"$(nproc)"
           make install
 
       - name: Build gensio for mipsel
@@ -44,21 +45,25 @@ jobs:
           ./configure --host=mipsel-linux-gnu --prefix=$HOME/mipsel-rootfs/usr \
             CPPFLAGS="-I$HOME/mipsel-rootfs/usr/include" \
             LDFLAGS="-L$HOME/mipsel-rootfs/usr/lib"
-          make -j$(nproc)
+          make -j"$(nproc)"
           make install
 
-      - name: Build ser2net for mipsel
+      - name: Build ser2net for mipsel (skip go examples)
         run: |
           ./reconf
-          ./configure --host=mipsel-linux-gnu --prefix=$HOME/mipsel-rootfs/usr \
+          # If ser2net supports --disable-go, uncomment next line:
+          # export CONFIGURE_OPTS="--disable-go"
+          ./configure --host=mipsel-linux-gnu --prefix=$HOME/mipsel-rootfs/usr $CONFIGURE_OPTS \
             CPPFLAGS="-I$HOME/mipsel-rootfs/usr/include" \
             LDFLAGS="-L$HOME/mipsel-rootfs/usr/lib"
-          make -j$(nproc) -C src
-          make install DESTDIR=$HOME/mipsel-rootfs
+          # Build only the core sources to avoid go/swig subdirs pulling in -m64
+          make -j"$(nproc)" -C src
+          # Run install for the built tree
+          make install DESTDIR="$HOME/mipsel-rootfs"
 
       - name: Package artifact
         run: |
-          tar czf ser2net-mipsel.tar.gz -C $HOME/mipsel-rootfs .
+          tar czf ser2net-mipsel.tar.gz -C "$HOME/mipsel-rootfs" .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
