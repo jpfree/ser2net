@@ -70,7 +70,8 @@ jobs:
           CPPFLAGS="-I$ROOTFS/usr/include" \
           LDFLAGS="-L$ROOTFS/usr/lib -static -lgensio -lgensioosh -lgensiomdns" \
           ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" \
-            --disable-shared --enable-static
+            --disable-shared --enable-static \
+            ac_cv_lib_gensio_str_to_gensio=yes
           make -j"$(nproc)"
           mipsel-linux-gnu-strip src/ser2net
           cp src/ser2net ser2net-mipsel-static
