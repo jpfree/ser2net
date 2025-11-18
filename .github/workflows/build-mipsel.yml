@@ -75,13 +75,7 @@ jobs:
           # 方案 B 兜底: 若 c++/swig/go 缺失，创建占位 Makefile 防止递归 make 失败
           if [ ! -d "c++/swig/go" ]; then
             mkdir -p c++/swig/go
-            cat > c++/swig/go/Makefile <<'EOF'
-# dummy Makefile to satisfy recursive build
-all:
-install:
-clean:
-.PHONY: all install clean
-EOF
+            printf '%s\n' '# dummy Makefile to satisfy recursive build' 'all:' 'install:' 'clean:' '.PHONY: all install clean' > c++/swig/go/Makefile
           fi
 
           make -j"$(nproc)"
