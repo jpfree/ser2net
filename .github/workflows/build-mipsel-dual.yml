@@ -1,0 +1,101 @@
+name: Build ser2net (dynamic + static) for mipsel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-dual:
+    runs-on: ubuntu-latest
+
+    env:
+      ROOTFS: /home/runner/mipsel-rootfs-dual
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install cross toolchain and build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-mipsel-linux-gnu g++-mipsel-linux-gnu \
+            make autoconf automake libtool pkg-config \
+            wget git perl
+
+      - name: Prepare rootfs dirs
+        run: |
+          mkdir -p "$ROOTFS/usr" "$ROOTFS/usr/lib" "$ROOTFS/usr/include" \
+                   "$ROOTFS/usr/sbin" "$ROOTFS/usr/etc" \
+                   "$ROOTFS/usr/libexec/gensio/3.0.0"
+
+      - name: Build libyaml (shared + static)
+        run: |
+          wget https://pyyaml.org/download/libyaml/yaml-0.2.5.tar.gz
+          tar xvf yaml-0.2.5.tar.gz
+          cd yaml-0.2.5
+          ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" \
+            --enable-shared --enable-static
+          make -j"$(nproc)"
+          make install
+
+      - name: Build OpenSSL (shared + static)
+        run: |
+          wget https://www.openssl.org/source/openssl-1.1.1w.tar.gz
+          tar xvf openssl-1.1.1w.tar.gz
+          cd openssl-1.1.1w
+          ./Configure linux-mips32 --cross-compile-prefix=mipsel-linux-gnu- \
+            --prefix="$ROOTFS/usr" shared no-tests
+          make -j"$(nproc)"
+          make install_sw
+
+      - name: Build gensio (shared + static)
+        run: |
+          git clone https://github.com/cminyard/gensio.git
+          cd gensio
+          autoreconf -fi
+          ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" \
+            --enable-shared --enable-static \
+            CPPFLAGS="-I$ROOTFS/usr/include" \
+            LDFLAGS="-L$ROOTFS/usr/lib"
+          rm -rf c++/swig/go c++/swig/python c++/swig/examples || true
+          make -C lib -j"$(nproc)"
+          make -C lib install
+          make -C include install
+
+      - name: Build ser2net (dynamic version)
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          ./reconf
+          PKG_CONFIG_PATH="$ROOTFS/usr/lib/pkgconfig" \
+          CPPFLAGS="-I$ROOTFS/usr/include" \
+          LDFLAGS="-L$ROOTFS/usr/lib" \
+          ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" \
+            --enable-shared --disable-static
+          make -j"$(nproc)"
+          mipsel-linux-gnu-strip ser2net
+          cp ser2net ser2net-mipsel-dynamic
+
+      - name: Clean build artifacts
+        run: |
+          make distclean || true
+
+      - name: Build ser2net (static version)
+        run: |
+          ./reconf
+          PKG_CONFIG_PATH="$ROOTFS/usr/lib/pkgconfig" \
+          CPPFLAGS="-I$ROOTFS/usr/include" \
+          LDFLAGS="-L$ROOTFS/usr/lib -static -lgensio -lgensioosh -lgensiomdns" \
+          ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" \
+            --disable-shared --enable-static \
+            ac_cv_lib_gensio_str_to_gensio=yes
+          make -j"$(nproc)"
+          mipsel-linux-gnu-strip ser2net
+          cp ser2net ser2net-mipsel-static
+
+      - name: Upload both binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: ser2net-mipsel-dual
+          path: |
+            ser2net-mipsel-static
+            ser2net-mipsel-dynamic
