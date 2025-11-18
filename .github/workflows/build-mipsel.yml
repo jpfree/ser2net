@@ -30,11 +30,12 @@ jobs:
           sudo apt-get install -y \
             gcc-mipsel-linux-gnu g++-mipsel-linux-gnu \
             make autoconf automake libtool pkg-config \
-            wget git perl libssl-dev
+            wget git perl
 
       - name: Prepare rootfs dirs
         run: |
-          mkdir -p "$ROOTFS/usr" "$ROOTFS/usr/lib" "$ROOTFS/usr/include" "$ROOTFS/usr/sbin" "$ROOTFS/usr/etc"
+          mkdir -p "$ROOTFS/usr" "$ROOTFS/usr/lib" "$ROOTFS/usr/include" \
+                   "$ROOTFS/usr/sbin" "$ROOTFS/usr/etc"
 
       - name: Build libyaml for mipsel
         run: |
@@ -50,7 +51,6 @@ jobs:
           wget https://www.openssl.org/source/openssl-1.1.1w.tar.gz
           tar xvf openssl-1.1.1w.tar.gz
           cd openssl-1.1.1w
-          # linux-mips32 target and cross-compile prefix
           ./Configure linux-mips32 --cross-compile-prefix=mipsel-linux-gnu- --prefix="$ROOTFS/usr" no-tests no-shared
           make -j"$(nproc)"
           make install_sw
@@ -60,27 +60,19 @@ jobs:
           git clone https://github.com/cminyard/gensio.git
           cd gensio
           autoreconf -i
-          # Prefer configure options to disable swig/go/examples if available
-          PKG_CONFIG_PATH="$ROOTFS/usr/lib/pkgconfig" \
-            ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" \
-              CPPFLAGS="-I$ROOTFS/usr/include" \
-              LDFLAGS="-L$ROOTFS/usr/lib" \
-              --disable-cxx --disable-swig --disable-examples --without-go || true
+          PKG_CONFIG_PATH="$ROOTFS/usr/lib/pkgconfig" ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" CPPFLAGS="-I$ROOTFS/usr/include" LDFLAGS="-L$ROOTFS/usr/lib" --disable-cxx --disable-swig --disable-examples --without-go || true
 
-          # --- 方案 A: 在生成的 Makefile 中移除对子目录 go 的引用 ---
-          # 查找包含子目录列表（SUBDIRS 或 SUBDIRS = ...）的文件，并删除 go 条目
-          set -e
+          # 方案 A: 在生成的 Makefile 中移除对子目录 go 的引用
           files=$(grep -lR "SUBDIRS" . || true)
           if [ -n "$files" ]; then
             for f in $files; do
               cp "$f" "$f.bak" || true
-              # 仅删除独立的单词 go（避免误删其它部分）
               sed -E -i 's/(^|[[:space:]])go([[:space:]]|$)/ /g' "$f" || true
               sed -E -i 's/[[:space:]]+/ /g' "$f" || true
             done
           fi
 
-          # --- 方案 B 兜底: 若 c++/swig/go 缺失，创建占位 Makefile 防止递归 make 失败 ---
+          # 方案 B 兜底: 若 c++/swig/go 缺失，创建占位 Makefile 防止递归 make 失败
           if [ ! -d "c++/swig/go" ]; then
             mkdir -p c++/swig/go
             cat > c++/swig/go/Makefile <<'EOF'
@@ -92,18 +84,13 @@ clean:
 EOF
           fi
 
-          # 继续构建 gensio（仅库）
           make -j"$(nproc)"
           make install
 
       - name: Build ser2net for mipsel (skip go examples)
         run: |
           ./reconf
-          PKG_CONFIG_PATH="$ROOTFS/usr/lib/pkgconfig" \
-            ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" \
-              CPPFLAGS="-I$ROOTFS/usr/include" \
-              LDFLAGS="-L$ROOTFS/usr/lib"
-          # 仅构建主程序 src，避免递归到 go/swig 示例
+          PKG_CONFIG_PATH="$ROOTFS/usr/lib/pkgconfig" ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" CPPFLAGS="-I$ROOTFS/usr/include" LDFLAGS="-L$ROOTFS/usr/lib"
           make -j"$(nproc)" -C src
           make install DESTDIR="$ROOTFS"
 
