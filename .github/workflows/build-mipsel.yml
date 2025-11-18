@@ -11,6 +11,10 @@ jobs:
   build-mipsel:
     runs-on: ubuntu-latest
 
+    env:
+      CFLAGS: ""
+      LDFLAGS: ""
+
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -36,7 +40,7 @@ jobs:
         run: |
           git clone https://github.com/cminyard/gensio.git
           cd gensio
-          autoreconf -i   # 生成 configure 脚本
+          autoreconf -i
           ./configure --host=mipsel-linux-gnu --prefix=$HOME/mipsel-rootfs/usr \
             CPPFLAGS="-I$HOME/mipsel-rootfs/usr/include" \
             LDFLAGS="-L$HOME/mipsel-rootfs/usr/lib"
@@ -49,7 +53,7 @@ jobs:
           ./configure --host=mipsel-linux-gnu --prefix=$HOME/mipsel-rootfs/usr \
             CPPFLAGS="-I$HOME/mipsel-rootfs/usr/include" \
             LDFLAGS="-L$HOME/mipsel-rootfs/usr/lib"
-          make -j$(nproc)
+          make -j$(nproc) -C src
           make install DESTDIR=$HOME/mipsel-rootfs
 
       - name: Package artifact
