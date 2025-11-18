@@ -56,7 +56,7 @@ jobs:
           make -j"$(nproc)"
           make install_sw
 
-      - name: Build gensio (core lib only, skip go/swig) for mipsel
+      - name: Build gensio (core lib only, skip swig/go) for mipsel
         run: |
           git clone https://github.com/cminyard/gensio.git
           cd gensio
@@ -75,12 +75,13 @@ jobs:
 
       - name: Build ser2net for mipsel
         run: |
+          cd "$GITHUB_WORKSPACE"
           ./reconf
           PKG_CONFIG_PATH="/home/runner/mipsel-rootfs/usr/lib/pkgconfig" \
           CPPFLAGS="-I/home/runner/mipsel-rootfs/usr/include" \
           LDFLAGS="-L/home/runner/mipsel-rootfs/usr/lib" \
           ./configure --host=mipsel-linux-gnu --prefix="/home/runner/mipsel-rootfs/usr"
-          make -j"$(nproc)" -C src
+          make -j"$(nproc)"
           make install DESTDIR="/home/runner/mipsel-rootfs"
 
       - name: Sanity list installed files
