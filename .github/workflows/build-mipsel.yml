@@ -42,7 +42,7 @@ jobs:
           wget https://pyyaml.org/download/libyaml/yaml-0.2.5.tar.gz
           tar xvf yaml-0.2.5.tar.gz
           cd yaml-0.2.5
-          ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr"
+          ./configure --host=mipsel-linux-gnu --prefix="$HOME/mipsel-rootfs/usr"
           make -j"$(nproc)"
           make install
 
@@ -52,7 +52,7 @@ jobs:
           tar xvf openssl-1.1.1w.tar.gz
           cd openssl-1.1.1w
           ./Configure linux-mips32 --cross-compile-prefix=mipsel-linux-gnu- \
-            --prefix="$ROOTFS/usr" no-tests no-shared
+            --prefix="$HOME/mipsel-rootfs/usr" no-tests no-shared
           make -j"$(nproc)"
           make install_sw
 
