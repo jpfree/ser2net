@@ -56,7 +56,7 @@ jobs:
           make -j"$(nproc)"
           make install_sw
 
-      - name: Build gensio (only lib) for mipsel
+      - name: Build gensio (full install) for mipsel
         run: |
           git clone https://github.com/cminyard/gensio.git
           cd gensio
@@ -64,16 +64,16 @@ jobs:
           ./configure --host=mipsel-linux-gnu --prefix="/home/runner/mipsel-rootfs/usr" \
             CPPFLAGS="-I/home/runner/mipsel-rootfs/usr/include" \
             LDFLAGS="-L/home/runner/mipsel-rootfs/usr/lib"
-          make -C lib -j"$(nproc)"
-          make -C lib install
+          make -j"$(nproc)"
+          make install
 
       - name: Build ser2net for mipsel
         run: |
           ./reconf
           PKG_CONFIG_PATH="/home/runner/mipsel-rootfs/usr/lib/pkgconfig" \
-            ./configure --host=mipsel-linux-gnu --prefix="/home/runner/mipsel-rootfs/usr" \
-              CPPFLAGS="-I/home/runner/mipsel-rootfs/usr/include" \
-              LDFLAGS="-L/home/runner/mipsel-rootfs/usr/lib"
+          CPPFLAGS="-I/home/runner/mipsel-rootfs/usr/include" \
+          LDFLAGS="-L/home/runner/mipsel-rootfs/usr/lib" \
+          ./configure --host=mipsel-linux-gnu --prefix="/home/runner/mipsel-rootfs/usr"
           make -j"$(nproc)" -C src
           make install DESTDIR="/home/runner/mipsel-rootfs"
 
