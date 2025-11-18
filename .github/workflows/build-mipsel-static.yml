@@ -73,8 +73,8 @@ jobs:
             --disable-shared --enable-static \
             ac_cv_lib_gensio_str_to_gensio=yes
           make -j"$(nproc)"
-          mipsel-linux-gnu-strip src/ser2net
-          cp src/ser2net ser2net-mipsel-static
+          mipsel-linux-gnu-strip ser2net
+          cp ser2net ser2net-mipsel-static
 
       - name: Upload static binary
         uses: actions/upload-artifact@v4
