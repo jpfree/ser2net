@@ -1,0 +1,81 @@
+name: Build static ser2net for mipsel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-static:
+    runs-on: ubuntu-latest
+
+    env:
+      ROOTFS: /home/runner/mipsel-rootfs-static
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install cross toolchain and build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-mipsel-linux-gnu g++-mipsel-linux-gnu \
+            make autoconf automake libtool pkg-config \
+            wget git perl
+
+      - name: Prepare rootfs dirs
+        run: |
+          mkdir -p "$ROOTFS/usr" "$ROOTFS/usr/lib" "$ROOTFS/usr/include" \
+                   "$ROOTFS/usr/sbin" "$ROOTFS/usr/etc"
+
+      - name: Build libyaml (static) for mipsel
+        run: |
+          wget https://pyyaml.org/download/libyaml/yaml-0.2.5.tar.gz
+          tar xvf yaml-0.2.5.tar.gz
+          cd yaml-0.2.5
+          ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" \
+            --disable-shared --enable-static
+          make -j"$(nproc)"
+          make install
+
+      - name: Build OpenSSL (static) for mipsel
+        run: |
+          wget https://www.openssl.org/source/openssl-1.1.1w.tar.gz
+          tar xvf openssl-1.1.1w.tar.gz
+          cd openssl-1.1.1w
+          ./Configure linux-mips32 --cross-compile-prefix=mipsel-linux-gnu- \
+            --prefix="$ROOTFS/usr" no-shared no-tests
+          make -j"$(nproc)"
+          make install_sw
+
+      - name: Build gensio (static only) for mipsel
+        run: |
+          git clone https://github.com/cminyard/gensio.git
+          cd gensio
+          autoreconf -fi
+          ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" \
+            --disable-shared --enable-static \
+            CPPFLAGS="-I$ROOTFS/usr/include" \
+            LDFLAGS="-L$ROOTFS/usr/lib -static"
+          rm -rf c++/swig/go c++/swig/python c++/swig/examples || true
+          make -C lib -j"$(nproc)"
+          make -C lib install
+          make -C include install
+
+      - name: Build ser2net (fully static) for mipsel
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          ./reconf
+          PKG_CONFIG_PATH="$ROOTFS/usr/lib/pkgconfig" \
+          CPPFLAGS="-I$ROOTFS/usr/include" \
+          LDFLAGS="-L$ROOTFS/usr/lib -static" \
+          ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" \
+            --disable-shared --enable-static
+          make -j"$(nproc)"
+          mipsel-linux-gnu-strip src/ser2net
+          cp src/ser2net ser2net-mipsel-static
+
+      - name: Upload static binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ser2net-mipsel-static
+          path: ser2net-mipsel-static
