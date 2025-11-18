@@ -18,7 +18,7 @@ jobs:
       GOOS: linux
       GOARCH: mipsle
       CGO_ENABLED: "0"
-      ROOTFS: $HOME/mipsel-rootfs
+      ROOTFS: /home/runner/mipsel-rootfs
 
     steps:
       - name: Checkout source
@@ -42,7 +42,7 @@ jobs:
           wget https://pyyaml.org/download/libyaml/yaml-0.2.5.tar.gz
           tar xvf yaml-0.2.5.tar.gz
           cd yaml-0.2.5
-          ./configure --host=mipsel-linux-gnu --prefix="$HOME/mipsel-rootfs/usr"
+          ./configure --host=mipsel-linux-gnu --prefix="/home/runner/mipsel-rootfs/usr"
           make -j"$(nproc)"
           make install
 
@@ -52,7 +52,7 @@ jobs:
           tar xvf openssl-1.1.1w.tar.gz
           cd openssl-1.1.1w
           ./Configure linux-mips32 --cross-compile-prefix=mipsel-linux-gnu- \
-            --prefix="$HOME/mipsel-rootfs/usr" no-tests no-shared
+            --prefix="/home/runner/mipsel-rootfs/usr" no-tests no-shared
           make -j"$(nproc)"
           make install_sw
 
@@ -61,21 +61,21 @@ jobs:
           git clone https://github.com/cminyard/gensio.git
           cd gensio
           autoreconf -fi
-          ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" \
-            CPPFLAGS="-I$ROOTFS/usr/include" \
-            LDFLAGS="-L$ROOTFS/usr/lib"
+          ./configure --host=mipsel-linux-gnu --prefix="/home/runner/mipsel-rootfs/usr" \
+            CPPFLAGS="-I/home/runner/mipsel-rootfs/usr/include" \
+            LDFLAGS="-L/home/runner/mipsel-rootfs/usr/lib"
           make -C lib -j"$(nproc)"
           make -C lib install
 
       - name: Build ser2net for mipsel
         run: |
           ./reconf
-          PKG_CONFIG_PATH="$ROOTFS/usr/lib/pkgconfig" \
-            ./configure --host=mipsel-linux-gnu --prefix="$ROOTFS/usr" \
-              CPPFLAGS="-I$ROOTFS/usr/include" \
-              LDFLAGS="-L$ROOTFS/usr/lib"
+          PKG_CONFIG_PATH="/home/runner/mipsel-rootfs/usr/lib/pkgconfig" \
+            ./configure --host=mipsel-linux-gnu --prefix="/home/runner/mipsel-rootfs/usr" \
+              CPPFLAGS="-I/home/runner/mipsel-rootfs/usr/include" \
+              LDFLAGS="-L/home/runner/mipsel-rootfs/usr/lib"
           make -j"$(nproc)" -C src
-          make install DESTDIR="$ROOTFS"
+          make install DESTDIR="/home/runner/mipsel-rootfs"
 
       - name: Sanity list installed files
         run: |
